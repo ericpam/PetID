@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPD 寵物身份證編輯器 V1.55</title>
+    <title>EPD 寵物身份證編輯器 V1.56</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         @font-face { font-family: 'AdobeMing'; src: url('Font/Adobe ming Std L.otf'); }
@@ -42,7 +42,7 @@
         .date-year { width: 45px; }
         .date-month-day { width: 35px; }
 
-        /* 鎖定狀態：反灰顯色且禁止點選 */
+        /* 一般鎖定狀態：反灰顯色且禁止點選 */
         input:disabled { background-color: #ececec; color: #999; cursor: not-allowed; }
         
         /* 綠碼專屬鎖定狀態：反灰底、綠字粗體 */
@@ -67,7 +67,7 @@
     </div>
 
     <h3>EPD 寵物身份證編輯器</h3>
-    <div class="version-tag">Ver 1.55 正式版</div>
+    <div class="version-tag">Ver 1.56 正式版</div>
 
     <div class="workspace-wrapper">
         <div class="canvas-label">● 身分證正面</div>
@@ -139,7 +139,7 @@
                 <div class="input-group"><label class="label-text">條碼類型:</label><select id="barcodeType" class="full-width" onchange="updateBarcodeType()"><option value="CODE128">會員 CODE 128</option><option value="CODE39">載具 CODE 39</option></select></div>
                 <div class="input-group">
                     <label class="align-mid-label">號碼:</label>
-                    <input type="text" id="backChipId" class="full-width" maxlength="15" value="000000000000000" oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g, ''); drawAll();">
+                    <input type="text" id="backChipId" class="full-width" maxlength="15" value="000000000000000">
                 </div>
             </div>
             <div class="input-row">
@@ -179,6 +179,7 @@
             b_green: { x: 361.2, y: 323.8, size: 27.9, spacing: -9, font: "AdobeMing", color: "#4EB748" }
         };
 
+        // 防呆：阻絕非數字，確保保留 00 字串以供渲染，並限制最大值
         function validateDate(el, maxVal) {
             let val = el.value.replace(/[^0-9]/g, ''); 
             if (val === "") {
@@ -242,15 +243,28 @@
             const backChipInput = document.getElementById('backChipId');
             
             if (type === "CODE39") {
-                backChipInput.maxLength = 10;
-                backChipInput.value = "ABCDEFG";
+                backChipInput.maxLength = 8; // 修正為 8 碼限制
+                backChipInput.value = "/ABCDEFG";
             } else {
                 backChipInput.maxLength = 15;
-                // 若從 CODE39 切回，則將正面晶片號碼濾除符號後帶入
+                // 若從 CODE39 切回，則將正面晶片號碼嚴格濾除符號後帶入
                 backChipInput.value = document.getElementById('chipId').value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
             }
             drawAll();
         }
+
+        // 動態處理背面條碼輸入事件，區分 CODE39 (允許含 /+-. 等) 與 CODE128 (純英數)
+        document.getElementById('backChipId').addEventListener('input', e => {
+            const type = document.getElementById('barcodeType').value;
+            if (type === "CODE39") {
+                // 允許英數字以及常見載具符號：/ + - .
+                e.target.value = e.target.value.replace(/[^a-zA-Z0-9\/\+\-\.]/g, '');
+            } else {
+                // CODE 128 嚴格限制英數字
+                e.target.value = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+            }
+            drawAll();
+        });
 
         document.getElementById('chipId').addEventListener('input', e => {
             if (document.getElementById('barcodeType').value === "CODE128") {
@@ -325,6 +339,7 @@
             
             renderText(fCtx, 'f_name', document.getElementById('petName').value, true);
             
+            // 年月日直接使用輸入框的值，取消自動補零
             const bY = document.getElementById('birthYear').value;
             const bM = document.getElementById('birthMonth').value;
             const bD = document.getElementById('birthDay').value;
@@ -357,26 +372,26 @@
             renderText(bCtx, 'b_phoneNum', document.getElementById('phoneNum').value, false);
             renderText(bCtx, 'b_birthPlace', document.getElementById('birthPlace').value, false);
             
-            // 住址動態預判：若字串過長需換行，則整體向上提升至 186.5
+            // 判斷住址是否超寬，若會換行則將 y 提升到 180
             const addrCfg = config['b_address'];
             bCtx.font = `${addrCfg.font === 'AdobeMing' || addrCfg.font === 'Mangal' ? 'bold ' : ''}${addrCfg.size}px '${addrCfg.font}'`;
-            let curX = addrCfg.x;
+            let testX = addrCfg.x;
             let needsWrap = false;
             const addrText = document.getElementById('address').value;
             for (let i = 0; i < addrText.length; i++) {
                 let charWidth = bCtx.measureText(addrText[i]).width + parseFloat(addrCfg.spacing);
-                if (curX + charWidth > addrCfg.x + 480) {
+                if (testX + charWidth > addrCfg.x + 480) {
                     needsWrap = true;
                     break;
                 }
-                curX += charWidth;
+                testX += charWidth;
             }
             
             const originalY = addrCfg.y;
-            if (needsWrap) config['b_address'].y = 186.5;
+            if (needsWrap) config['b_address'].y = 180; 
             
             renderText(bCtx, 'b_address', addrText, false, 480, 32);
-            config['b_address'].y = originalY; // 繪製完畢後還原 Y 座標
+            config['b_address'].y = originalY; // 繪製完畢還原
 
             const barcodeContent = document.getElementById('backChipId').value;
             const barcodeType = document.getElementById('barcodeType').value;
