@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPD 寵物身份證編輯器 V1.97</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        /* 字型載入 */
+        @font-face { font-family: 'AdobeMing'; src: url('Font/Adobe ming Std L.otf'); }
+        @font-face { font-family: 'MingLiU'; src: url('Font/新細明體.ttc'); }
+        @font-face { font-family: 'KaiU'; src: url('Font/標楷體.ttc'); }
+        @font-face { font-family: 'Mangal'; src: url('Font/mangal.ttf'); }
+
+        :root { --bg-color: #f8f9fa; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: var(--bg-color); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+        
+        h3 { margin: 10px 0 0 0; color: #333; letter-spacing: 2px; font-weight: bold; }
+        .version-tag { font-size: 12px; color: #888; margin-bottom: 20px; }
+
+        .workspace-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 600px; gap: 15px; }
+        .preview-container { line-height: 0; background-color: transparent; width: 100%; }
+        canvas { display: block; border: 1px solid #ccc; border-radius: 20px; background-color: transparent; width: 100%; max-width: 600px; height: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .canvas-label { font-size: 14px; color: #666; margin-bottom: 5px; font-weight: bold; width: 100%; text-align: left; }
+
+        .input-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 15px; }
+        .section-title { font-size: 14px; font-weight: bold; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        
+        .input-row { display: flex; gap: 5px; align-items: flex-start; width: 100%; }
+        .label-text { font-weight: bold; font-size: 13px; color: #444; width: 100px; flex-shrink: 0; text-align: left; padding-top: 8px; }
+        .input-content { flex: 1; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+        .flex-group { display: flex; gap: 8px; align-items: center; width: 100%; flex-wrap: wrap; }
+
+        .issue-content-wrapper { display: flex; flex-direction: row; gap: 8px; align-items: center; }
+        .issue-location-group { display: flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; }
+
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        .full-width { flex: 1; width: 100%; }
+        .upload-btn { cursor: pointer; padding: 7px; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; transition: 0.2s; flex: 1; }
+
+        .green-hint { font-size: 12px; color: #28a745; margin-top: -5px; line-height: 1.2; font-weight: bold; }
+        .black-hint { font-size: 12px; color: #000; margin-top: -5px; line-height: 1.2; font-weight: normal; }
+
+        .date-text-group { white-space: nowrap; display: flex; align-items: center; gap: 3px; font-size: 13px; }
+        .download-main-btn { width: 100%; padding: 14px; background-color: #28a745; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; letter-spacing: 4px; transition: 0.2s; }
+        .download-main-btn:hover { background-color: #218838; }
+        .download-main-btn:disabled { background-color: #888; cursor: not-allowed; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 90%; max-width: 380px; text-align: center; }
+        .modal-warning { color: #dc3545; font-size: 14px; font-weight: bold; margin-bottom: 15px; line-height: 1.4; }
+        .modal-input-label { text-align: left; font-size: 13px; font-weight: bold; color: #333; margin-bottom: 5px; }
+        .modal-info-list { text-align: left; font-size: 13px; color: #007bff; margin-bottom: 20px; font-weight: bold; padding-left: 10px; border-left: 3px solid #007bff; line-height: 1.6; }
+        .modal-btn-group { display: flex; justify-content: center; gap: 10px; }
+        .modal-btn { background-color: #007bff; color: white; border: none; padding: 10px 25px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .modal-btn:disabled { background-color: #ccc !important; color: #666 !important; cursor: not-allowed; }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .label-text { width: 100px !important; }
+            .parents-toggle-box { width: 100%; margin-top: -5px; }
+            #fatherLabel, #motherLabel { width: 60px !important; flex-shrink: 0; }
+            .issue-content-wrapper { flex-direction: column; align-items: flex-start; gap: 8px; }
+        }
+
+        input:disabled { background-color: #ececec; color: #999; cursor: not-allowed; }
+        #greenSerial:disabled { background-color: #ececec; color: #4EB748; font-weight: bold; border-color: #ddd; }
+        .easy-card-label { font-size: 12px; color: #444; display: flex; align-items: center; gap: 3px; cursor: pointer; white-space: nowrap; }
+        #barcodeTemp { display: none; }
+    </style>
+</head>
+<body>
+
+    <div style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden;">
+        <span style="font-family: 'AdobeMing';">預載</span><span style="font-family: 'MingLiU';">預載</span>
+        <span style="font-family: 'KaiU';">預載</span><span style="font-family: 'Mangal';">預載</span>
+    </div>
+
+    <h3>EPD 寵物身份證編輯器</h3>
+    <div class="version-tag">Ver 1.97 正式版 (Dropbox 雲端自動上傳 - 專屬網址)</div>
+
+    <div class="workspace-wrapper">
+        <div class="canvas-label">● 身分證正面</div>
+        <div class="preview-container"><canvas id="frontCanvas" width="600" height="360"></canvas></div>
+
+        <div class="input-container">
+            <div class="section-title">正面資料</div>
+            <div class="input-row">
+                <div class="label-text">寵物品種:</div>
+                <div class="input-content"><select id="species" class="full-width"></select></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">大頭照:</div>
+                <div class="input-content">
+                    <div class="flex-group">
+                        <input type="file" id="photoUpload" accept="image/*" style="display:none">
+                        <button class="upload-btn" onclick="document.getElementById('photoUpload').click()">選擇檔案</button>
+                        <label class="easy-card-label"><input type="checkbox" id="bgRemoval"> 大頭照去背</label>
+                    </div>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">姓名:</div>
+                <div class="input-content">
+                    <div class="flex-group">
+                        <input type="text" id="petName" class="full-width" value="請輸入" maxlength="5" oninput="validatePetName(this)">
+                        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
+                            <span style="font-size:13px; font-weight:bold; color:#444;">性別:</span>
+                            <select id="gender" style="width:60px;"><option>公</option><option>母</option><option>男</option><option>女</option></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">出生年月日:</div>
+                <div class="input-content">
+                    <div class="date-text-group">
+                        民國 <input type="text" inputmode="numeric" id="birthYear" style="width:45px; text-align:center;" maxlength="3" value="" placeholder="000" oninput="validateDate(this, 999)"> 年 
+                        <input type="text" inputmode="numeric" id="birthMonth" style="width:35px; text-align:center;" maxlength="2" value="" placeholder="00" oninput="validateDate(this, 12)"> 月 
+                        <input type="text" inputmode="numeric" id="birthDay" style="width:35px; text-align:center;" maxlength="2" value="" placeholder="00" oninput="validateDate(this, 31)"> 日
+                    </div>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">發證日期:</div>
+                <div class="input-content issue-content-wrapper">
+                    <div class="date-text-group">
+                        民國 <input type="text" inputmode="numeric" id="issueYear" style="width:45px; text-align:center;" maxlength="3" oninput="validateDate(this, 999)"> 年 
+                        <input type="text" inputmode="numeric" id="issueMonth" style="width:35px; text-align:center;" maxlength="2" oninput="validateDate(this, 12)"> 月 
+                        <input type="text" inputmode="numeric" id="issueDay" style="width:35px; text-align:center;" maxlength="2" oninput="validateDate(this, 31)"> 日
+                    </div>
+                    <div class="issue-location-group">
+                        (<input type="text" id="issueLocation" style="width:60px; text-align:center;" maxlength="3" value="">) 初發
+                        <button type="button" class="upload-btn" style="background-color: #ddd; color: #333; margin-left: 5px; flex: 0 0 auto; padding: 6px 10px;" onclick="showYearCalcModal()">西元轉民國年</button>
+                    </div>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">晶片號碼:</div>
+                <div class="input-content">
+                    <input type="text" id="chipId" maxlength="15" class="full-width" value="000000000000000" oninput="syncBarcodeValue(this.value)">
+                    <div class="black-hint">晶片為15碼，沒有晶片號碼會全部用0代替</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-label">● 身分證背面</div>
+        <div class="preview-container"><canvas id="backCanvas" width="600" height="360"></canvas></div>
+
+        <div class="input-container">
+            <div class="section-title">背面資料</div>
+            <div class="input-row">
+                <div class="label-text">父母欄:</div>
+                <div class="input-content">
+                    <div class="flex-group">
+                        <input type="text" id="fatherLabel" value="父" disabled style="width:60px; text-align:center;" maxlength="3" oninput="drawAll()"> 
+                        <input type="text" id="fatherName" class="full-width" maxlength="5" value="請輸入">
+                    </div>
+                    <div class="flex-group">
+                        <input type="text" id="motherLabel" value="母" disabled style="width:60px; text-align:center;" maxlength="3" oninput="drawAll()"> 
+                        <input type="text" id="motherName" class="full-width" maxlength="5" value="請輸入">
+                        <div class="parents-toggle-box">
+                            <label class="easy-card-label"><input type="checkbox" id="editParentsToggle" onchange="toggleParentsEdit()"> 變更父母欄</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">品種:</div>
+                <div class="input-content"><input type="text" id="breedName" class="full-width" maxlength="5" value="請輸入"></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">電話:</div>
+                <div class="input-content"><input type="text" inputmode="numeric" id="phoneNum" class="full-width" maxlength="10" value="0900000000" oninput="this.value=this.value.replace(/[^0-9]/g, ''); drawAll();"></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">出生地:</div>
+                <div class="input-content"><input type="text" id="birthPlace" class="full-width" value="新北市" maxlength="7"></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">住址:</div>
+                <div class="input-content"><input type="text" id="address" class="full-width" value="請輸入" maxlength="36"></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">條碼類型:</div>
+                <div class="input-content"><select id="barcodeType" class="full-width" onchange="updateBarcodeType()"><option value="CODE128">會員 CODE 128</option><option value="CODE39">載具 CODE 39</option></select></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">條碼號碼:</div>
+                <div class="input-content"><input type="text" id="backChipId" class="full-width" maxlength="15" value="000000000000000" oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g, ''); drawAll();"></div>
+            </div>
+            <div class="input-row">
+                <div class="label-text">綠碼:</div>
+                <div class="input-content">
+                    <div class="flex-group">
+                        <input type="text" id="greenSerial" class="full-width" disabled>
+                        <label class="easy-card-label"><input type="checkbox" id="easyCardEnable" onchange="updateGreenSerialLogic()"> 加悠遊卡功能</label>
+                    </div>
+                    <div id="greenSerialHint" class="green-hint">此綠碼為參考格式，真實號碼會以下單順序為主</div>
+                </div>
+            </div>
+
+            <div style="border-top: 1px dashed #ddd; margin-top: 5px; padding-top: 10px;">
+                <button class="download-main-btn" onclick="showShopeeModal()">確定送出</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="shopeeModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-warning">請確定填入的資料是否正確再送出，送出後將無法修改</div>
+            <div class="modal-input-label">蝦皮帳號:</div>
+            <input type="text" id="shopeeId" class="modal-input" placeholder="請輸入蝦皮帳號..." oninput="checkModalInput()" style="width:100%; margin-bottom:10px; padding:10px; border:1px solid #ccc; border-radius:4px;">
+            <div id="modalInfo" class="modal-info-list"></div>
+            <div class="modal-btn-group">
+                <button id="modalConfirmBtn" class="modal-btn" onclick="executeDownload()" disabled>確定</button>
+                <button class="modal-btn" style="background-color: #ddd; color: #666;" onclick="document.getElementById('shopeeModal').style.display='none'">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="yearCalcModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 300px; padding: 20px;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #333;">西元轉民國年計算機</div>
+            <div style="display: flex; align-items: center; justify-content: flex-start; font-size: 14px; font-weight: bold; margin-bottom: 15px; padding-left: 20px;">
+                <span style="width: 45px; text-align: left;">西元:</span>
+                <input type="number" id="calcCeYear" style="width: 80px; padding: 6px; text-align: center; border-radius: 4px; border: 1px solid #ccc;" oninput="updateMinguoYear()">
+                <span style="margin-left: 5px;">年</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: flex-start; font-size: 14px; font-weight: bold; margin-bottom: 25px; padding-left: 20px;">
+                <span style="width: 45px; text-align: left;">民國:</span>
+                <span id="calcMinguoYear" style="width: 80px; text-align: center; color: #28a745; font-size: 16px;"></span>
+                <span style="margin-left: 5px;">年</span>
+                <button type="button" style="background-color: #3498db; color: white; border: none; padding: 5px 12px; border-radius: 4px; margin-left: 15px; cursor: pointer; font-weight: bold;" onclick="copyMinguoYear()">複製</button>
+            </div>
+            <div class="modal-btn-group">
+                <button type="button" class="modal-btn" style="background-color: #ddd; color: #333;" onclick="document.getElementById('yearCalcModal').style.display='none'">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="barcodeTemp"></canvas>
+
+    <script>
+        const fCanvas = document.getElementById('frontCanvas'), fCtx = fCanvas.getContext('2d');
+        const bCanvas = document.getElementById('backCanvas'), bCtx = bCanvas.getContext('2d');
+        const fBgImg = new Image(), bBgImg = new Image();
+        let petPhoto = new Image(), originalPhotoFile = null;
+
+        const config = {
+            photo: { x: 412, y: 36, w: 165, h: 212 },
+            f_name: { x: 101.5, y: 182.7, size: 30.1, spacing: 25, font: "AdobeMing", color: "#000000" },
+            f_birth: { x: 101.5, y: 259.8, size: 24.3, spacing: 0, font: "MingLiU", color: "#000000" },
+            f_issue: { x: 101.5, y: 320.8, size: 19.5, spacing: 0, font: "MingLiU", color: "#000000" },
+            f_gender: { x: 509.1, y: 259.1, size: 19.8, spacing: 0.0, font: 'MingLiU', color: '#000000' },
+            f_chip: { x: 401.4, y: 322.8, size: 21.1, spacing: -8.9, font: 'KaiU', color: '#e74c3c' },
+            
+            b_fLabel: { x: 19.1, y: 24.9, size: 22.4, spacing: 0, font: "AdobeMing", color: "#000000" },
+            b_fName: { x: 102, y: 27.7, size: 26.7, spacing: 2.8, font: "MingLiU", color: "#000000" },
+            b_mLabel: { x: 284.9, y: 24.9, size: 22.4, spacing: 0, font: "AdobeMing", color: "#000000" },
+            b_mName: { x: 375, y: 27.7, size: 26.7, spacing: 2.8, font: "MingLiU", color: "#000000" },
+            
+            b_breedName: { x: 102, y: 85.5, size: 26.7, spacing: 2.8, font: "MingLiU", color: "#000000" },
+            b_phoneNum: { x: 374.9, y: 85, size: 26.7, spacing: 0, font: "MingLiU", color: "#000000" },
+            b_birthPlace: { x: 100, y: 135, size: 26.7, spacing: 1, font: "MingLiU", color: "#000000" },
+            b_address: { x: 99.1, y: 196, size: 25, spacing: 0, font: "MingLiU", color: "#000000" },
+            b_barcode: { x: 38, y: 267, width: 2, height: 75 }, 
+            b_green: { x: 361.2, y: 323.8, size: 27.9, spacing: -9, font: "AdobeMing", color: "#4EB748" }
+        };
+
+        function validatePetName(el) { el.value = el.value.substring(0, 5); drawAll(); }
+        function validateDate(el, maxVal) { 
+            let val = el.value.replace(/[^0-9]/g, ''); 
+            if (val !== "") {
+                let num = parseInt(val, 10);
+                if(num > maxVal) num = maxVal;
+                el.value = num.toString();
+            } else { el.value = ""; }
+            drawAll(); 
+        }
+
+        const speciesList = [
+            { label: "01.犬民", file: "犬民" }, { label: "02.貓民", file: "貓民" }, { label: "03.鼠民", file: "鼠民" },
+            { label: "04.兔民", file: "兔民" }, { label: "05.鳥民", file: "鳥民" }, { label: "06.龜民", file: "龜民" },
+            { label: "07.鼯民", file: "鼯民" }, { label: "08.刺民", file: "刺民" }, { label: "09.鴨民", file: "鴨民" },
+            { label: "10.蜥民", file: "蜥民" }, { label: "11.獴民", file: "獴民" }, { label: "12.蛙民", file: "蛙民" },
+            { label: "13.蛇民", file: "蛇民" }, { label: "14.豬民", file: "豬民" }, { label: "15.魚民", file: "魚民" },
+            { label: "16.貂民", file: "貂民" }, { label: "17.鵝民", file: "鵝民" }, { label: "18.獺民", file: "獺民" },
+            { label: "19.狐民", file: "狐民" }, { label: "20.鱷民", file: "鱷民" }, { label: "21.羊民", file: "羊民" },
+            { label: "22.甲民", file: "甲民" }, { label: "23.螳民", file: "螳螂" }, { label: "24.雞民", file: "雞民" },
+            { label: "25.驢民", file: "驢民" }, { label: "99.娃娃", file: "娃娃" }
+        ];
+
+        const speciesSelect = document.getElementById('species');
+        speciesList.forEach(item => { const opt = document.createElement('option'); opt.value = item.file; opt.textContent = item.label; speciesSelect.appendChild(opt); });
+
+        function toFullWidth(str) { return str.replace(/[!-~]/g, s => String.fromCharCode(s.charCodeAt(0) + 0xFEE0)).replace(/ /g, "\u3000"); }
+        function generateGreenSerial() { const now = new Date(); const ymd = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`; return `${ymd}000`; }
+
+        function updateGreenSerialLogic() { 
+            const isEasy = document.getElementById('easyCardEnable').checked;
+            document.getElementById('greenSerial').value = isEasy ? "000 000000 0" : generateGreenSerial(); 
+            document.getElementById('greenSerialHint').innerText = isEasy ? "此綠碼為參考格式，真實號碼會以悠遊卡號為主" : "此綠碼為參考格式，真實號碼會以下單順序為主";
+            drawAll(); 
+        }
+
+        function updateBackgrounds() { 
+            fBgImg.src = `image_BG/${speciesSelect.value}證_F.jpg`; 
+            const isCustomParents = document.getElementById('editParentsToggle').checked;
+            bBgImg.src = `image_BG/${speciesSelect.value}${isCustomParents ? '證_KC.jpg' : '證_K.jpg'}`; 
+        }
+
+        function toggleParentsEdit() { 
+            const isChecked = document.getElementById('editParentsToggle').checked;
+            const fLab = document.getElementById('fatherLabel');
+            const mLab = document.getElementById('motherLabel');
+            
+            fLab.disabled = !isChecked; 
+            mLab.disabled = !isChecked; 
+            
+            if (!isChecked) {
+                fLab.value = "父";
+                mLab.value = "母";
+            }
+            updateBackgrounds(); 
+        }
+
+        function syncBarcodeValue(val) { if (document.getElementById('barcodeType').value === "CODE128") document.getElementById('backChipId').value = val.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15); drawAll(); }
+        function updateBarcodeType() { const type = document.getElementById('barcodeType').value, backChipInput = document.getElementById('backChipId'); if (type === "CODE39") { backChipInput.maxLength = 8; backChipInput.value = "/ABCDEFG"; } else { backChipInput.maxLength = 15; backChipInput.value = document.getElementById('chipId').value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15); } drawAll(); }
+
+        document.getElementById('photoUpload').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (file) { originalPhotoFile = file; const reader = new FileReader(); reader.onload = ev => { petPhoto = new Image(); petPhoto.onload = drawAll; petPhoto.src = ev.target.result; }; reader.readAsDataURL(file); }
+        });
+
+        function showYearCalcModal() { const currentYear = new Date().getFullYear(); document.getElementById('calcCeYear').value = currentYear; updateMinguoYear(); document.getElementById('yearCalcModal').style.display = 'flex'; }
+        function updateMinguoYear() { const ceYear = parseInt(document.getElementById('calcCeYear').value) || 0; const mgYear = ceYear > 1911 ? (ceYear - 1911) : 0; document.getElementById('calcMinguoYear').innerText = mgYear; }
+        function copyMinguoYear() { const mgYear = document.getElementById('calcMinguoYear').innerText; const tempInput = document.createElement("input"); tempInput.value = mgYear; document.body.appendChild(tempInput); tempInput.select(); document.execCommand("copy"); document.body.removeChild(tempInput); alert("已成功複製民國年：" + mgYear); }
+
+        let isDrawing = false;
+        function drawAll() { if (isDrawing) return; isDrawing = true; requestAnimationFrame(() => { if (fBgImg.complete) drawFront(); if (bBgImg.complete) drawBack(); isDrawing = false; }); }
+
+        function renderText(targetCtx, key, text, useFullWidth, scale = 1, maxWidth = null, lineHeight = null) {
+            const cfg = config[key];
+            targetCtx.fillStyle = cfg.color || "black";
+            targetCtx.font = `${cfg.font === 'AdobeMing' || cfg.font === 'Mangal' || (cfg.font === 'KaiU' && cfg.color === '#e74c3c') ? 'bold ' : ''}${cfg.size * scale}px '${cfg.font}'`;
+            const processedText = useFullWidth ? toFullWidth(text) : text;
+            let curX = cfg.x * scale, curY = cfg.y * scale;
+            if (maxWidth) {
+                let chars = processedText.split('');
+                for (let i = 0; i < chars.length; i++) {
+                    let charWidth = targetCtx.measureText(chars[i]).width + parseFloat(cfg.spacing) * scale;
+                    if (curX + charWidth > (cfg.x + maxWidth) * scale) { curX = cfg.x * scale; curY += lineHeight * scale; }
+                    targetCtx.fillText(chars[i], curX, curY); curX += charWidth;
+                }
+            } else {
+                processedText.split('').forEach(char => { targetCtx.fillText(char, curX, curY); curX += targetCtx.measureText(char).width + parseFloat(cfg.spacing) * scale; });
+            }
+        }
+
+        function formatParentLabel(text) {
+            if (text.length === 2) return text.charAt(0) + '\u3000' + text.charAt(1);
+            return text;
+        }
+
+        function drawFront(scale = 1, ctx = fCtx, hidePhotoForExport = false) {
+            ctx.clearRect(0, 0, 600*scale, 360*scale); ctx.drawImage(fBgImg, 0, 0, 600*scale, 360*scale);
+            if (petPhoto.complete && petPhoto.naturalWidth > 0 && !hidePhotoForExport) {
+                ctx.drawImage(petPhoto, config.photo.x*scale, config.photo.y*scale, config.photo.w*scale, config.photo.h*scale);
+            }
+            ctx.textBaseline = "top"; let rawName = document.getElementById('petName').value;
+            config.f_name.spacing = /[\u4e00-\u9fa5]/.test(rawName) ? 25 : -2;
+            renderText(ctx, 'f_name', rawName, true, scale);
+            const bY = document.getElementById('birthYear').value.trim(); const bM = document.getElementById('birthMonth').value.trim(); const bD = document.getElementById('birthDay').value.trim();
+            const iY = document.getElementById('issueYear').value.trim(); const iM = document.getElementById('issueMonth').value.trim(); const iD = document.getElementById('issueDay').value.trim();
+            renderText(ctx, 'f_birth', `民國${bY || '000'}年${bM || '00'}月${bD || '00'}日`, false, scale);
+            const locStr = document.getElementById('issueLocation').value.trim()==="" ? "" : `(${document.getElementById('issueLocation').value})`;
+            renderText(ctx, 'f_issue', `民國${iY || '000'}年${iM || '00'}月${iD || '00'}日${locStr}初發`, false, scale);
+            renderText(ctx, 'f_gender', document.getElementById('gender').value, false, scale);
+            renderText(ctx, 'f_chip', document.getElementById('chipId').value, true, scale);
+        }
+
+        function drawBack(scale = 1, ctx = bCtx, hideGreen = false) {
+            ctx.clearRect(0, 0, 600*scale, 360*scale); ctx.drawImage(bBgImg, 0, 0, 600*scale, 360*scale);
+            ctx.textBaseline = "top"; 
+            
+            if (document.getElementById('editParentsToggle').checked) {
+                const fLab = formatParentLabel(document.getElementById('fatherLabel').value.trim());
+                const mLab = formatParentLabel(document.getElementById('motherLabel').value.trim());
+                renderText(ctx, 'b_fLabel', fLab, false, scale);
+                renderText(ctx, 'b_mLabel', mLab, false, scale);
+            }
+
+            renderText(ctx, 'b_fName', document.getElementById('fatherName').value, false, scale);
+            renderText(ctx, 'b_mName', document.getElementById('motherName').value, false, scale);
+            renderText(ctx, 'b_breedName', document.getElementById('breedName').value, false, scale);
+            renderText(ctx, 'b_phoneNum', document.getElementById('phoneNum').value, false, scale);
+            renderText(ctx, 'b_birthPlace', document.getElementById('birthPlace').value, false, scale);
+            const addrCfg = config['b_address'], addrText = document.getElementById('address').value;
+            ctx.font = `${addrCfg.font==='AdobeMing'?'bold ':''}${addrCfg.size*scale}px '${addrCfg.font}'`;
+            let testX = addrCfg.x * scale, needsWrap = false;
+            for (let i = 0; i < addrText.length; i++) {
+                let cw = ctx.measureText(addrText[i]).width + parseFloat(addrCfg.spacing) * scale;
+                if (testX + cw > (addrCfg.x + 480) * scale) { needsWrap = true; break; }
+                testX += cw;
+            }
+            const originalY = addrCfg.y; if (needsWrap) config['b_address'].y = 180;
+            renderText(ctx, 'b_address', addrText, false, scale, 480, 32); config['b_address'].y = originalY;
+            
+            const bcText = document.getElementById('backChipId').value, bcType = document.getElementById('barcodeType').value, bc = config.b_barcode;
+            if(bcText.trim() !== "") {
+                const bCanvasTemp = document.getElementById('barcodeTemp');
+                JsBarcode(bCanvasTemp, bcText, { format: bcType, width: bc.width*scale, height: bc.height*scale, displayValue: false, background: "rgba(0,0,0,0)", margin: 0 });
+                ctx.drawImage(bCanvasTemp, bc.x*scale, bc.y*scale);
+            }
+            if (!hideGreen) renderText(ctx, 'b_green', document.getElementById('greenSerial').value, true, scale);
+        }
+
+        function showShopeeModal() {
+            const petName = document.getElementById('petName').value.trim();
+            const bY = document.getElementById('birthYear').value.trim();
+            const bM = document.getElementById('birthMonth').value.trim();
+            const bD = document.getElementById('birthDay').value.trim();
+            const iY = document.getElementById('issueYear').value.trim();
+            const iM = document.getElementById('issueMonth').value.trim();
+            const iD = document.getElementById('issueDay').value.trim();
+
+            if (petName === "" || petName === "請輸入" || bY === "" || bM === "" || bD === "" || iY === "" || iM === "" || iD === "") {
+                alert("資料不可為空白！請確實填寫「姓名」、「出生年月日」與「發證日期」。");
+                return;
+            }
+
+            let infoHtml = "";
+            if(document.getElementById('bgRemoval').checked) infoHtml += "<div>● 加選 大頭照去背</div>";
+            if(document.getElementById('editParentsToggle').checked) infoHtml += `<div>● 加選 變更父母欄 (父 改 ${document.getElementById('fatherLabel').value}, 母 改 ${document.getElementById('motherLabel').value})</div>`;
+            if(document.getElementById('easyCardEnable').checked) infoHtml += "<div>● 加選 悠遊卡功能</div>";
+            document.getElementById('modalInfo').innerHTML = infoHtml || "<div>( 無加選項目 )</div>";
+            document.getElementById('shopeeModal').style.display = 'flex'; document.getElementById('shopeeId').focus(); checkModalInput();
+        }
+
+        function checkModalInput() {
+            const val = document.getElementById('shopeeId').value.trim(), btn = document.getElementById('modalConfirmBtn');
+            if (!originalPhotoFile) { btn.disabled = true; btn.innerHTML = "請先上傳大頭照"; }
+            else if (val.length === 0) { btn.disabled = true; btn.innerHTML = "確定"; }
+            else { btn.disabled = false; btn.innerHTML = "確定"; }
+        }
+
+        // ================= 核心：寫入真實 JPG 254 DPI =================
+        async function changeDpiBlob(blob, targetDpi) {
+            const arrayBuffer = await blob.arrayBuffer();
+            const dataView = new DataView(arrayBuffer);
+            let offset = 0;
+            if (dataView.getUint16(offset) !== 0xFFD8) return blob; 
+            offset += 2;
+            
+            while (offset < dataView.byteLength) {
+                const marker = dataView.getUint16(offset);
+                const length = dataView.getUint16(offset + 2);
+                
+                if (marker === 0xFFE0 && dataView.getUint32(offset + 4) === 0x4A464946) {
+                    dataView.setUint8(offset + 11, 1); 
+                    dataView.setUint16(offset + 12, targetDpi); 
+                    dataView.setUint16(offset + 14, targetDpi); 
+                    return new Blob([arrayBuffer], { type: 'image/jpeg' });
+                }
+                offset += 2 + length;
+            }
+            return blob;
+        }
+
+        async function executeDownload() {
+            const btn = document.getElementById('modalConfirmBtn');
+            btn.innerHTML = "打包與上傳中...";
+            btn.disabled = true;
+
+            const shopeeId = document.getElementById('shopeeId').value.trim();
+            const petName = document.getElementById('petName').value || "未命名";
+            const speciesValue = document.getElementById('species').value;
+            const isBgRemoval = document.getElementById('bgRemoval').checked;
+            
+            const exportCanvas = document.createElement('canvas'); exportCanvas.width = 900; exportCanvas.height = 540; const exCtx = exportCanvas.getContext('2d');
+            
+            drawFront(1.5, exCtx, isBgRemoval); 
+            const frontBlobRaw = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/jpeg', 1.0));
+            const frontBlob = await changeDpiBlob(frontBlobRaw, 254);
+            
+            drawBack(1.5, exCtx, true); 
+            const backBlobRaw = await new Promise(resolve => exportCanvas.toBlob(resolve, 'image/jpeg', 1.0));
+            const backBlob = await changeDpiBlob(backBlobRaw, 254);
+            
+            const zip = new JSZip(), ymd = new Date().toISOString().slice(0,10).replace(/-/g,"");
+            const zipFilename = `${ymd}-${shopeeId}-${petName}.zip`;
+
+            zip.file(`${speciesValue}證_${petName}_F.jpg`, frontBlob); 
+            zip.file(`${speciesValue}證_${petName}_K.jpg`, backBlob);
+            
+            if (isBgRemoval && originalPhotoFile) {
+                const ext = originalPhotoFile.name.split('.').pop();
+                zip.file(`${petName}.${ext}`, originalPhotoFile);
+            }
+
+            const zipContent = await zip.generateAsync({ type: "blob" });
+
+            // ================= 雲端 Webhook 上傳機制 =================
+            const WEBHOOK_URL = "https://hook.us2.make.com/29alj8v8ayr4k59rur7l4g3fgfinuyqb"; 
+
+            if (WEBHOOK_URL.startsWith("http")) {
+                const formData = new FormData();
+                formData.append("file", zipContent, zipFilename);
+                formData.append("shopeeId", shopeeId);
+                formData.append("petName", petName);
+
+                try {
+                    await fetch(WEBHOOK_URL, { method: "POST", body: formData });
+                    console.log("雲端上傳成功");
+                } catch (e) {
+                    console.error("雲端上傳失敗", e);
+                    alert("⚠️ 雲端上傳失敗，但仍會下載至您的電腦，請稍後檢查網路狀態。");
+                }
+            }
+            // ========================================================
+
+            const link = document.createElement('a'); 
+            link.href = URL.createObjectURL(zipContent); 
+            link.download = zipFilename; 
+            link.click(); 
+            URL.revokeObjectURL(link.href); 
+
+            document.getElementById('shopeeModal').style.display = 'none';
+            btn.innerHTML = "確定";
+            btn.disabled = false;
+        }
+
+        document.fonts.ready.then(() => {
+            document.querySelectorAll('input:not([type="file"]), select').forEach(el => el.addEventListener('input', drawAll));
+            fBgImg.onload = drawAll; bBgImg.onload = drawAll; updateBackgrounds();
+            document.getElementById('greenSerial').value = generateGreenSerial();
+            
+            const now = new Date();
+            document.getElementById('issueYear').value = now.getFullYear() - 1911;
+            document.getElementById('issueMonth').value = now.getMonth() + 1;
+            document.getElementById('issueDay').value = now.getDate();
+            document.getElementById('birthYear').value = ""; document.getElementById('birthMonth').value = ""; document.getElementById('birthDay').value = "";
+            
+            petPhoto = new Image(); petPhoto.onload = drawAll; petPhoto.src = 'Headshot.png'; 
+        });
+        
+        speciesSelect.addEventListener('change', () => { updateBackgrounds(); });
+        
+        window.onclick = e => { 
+            if(e.target == document.getElementById('shopeeModal')) document.getElementById('shopeeModal').style.display = 'none'; 
+            if(e.target == document.getElementById('yearCalcModal')) document.getElementById('yearCalcModal').style.display = 'none'; 
+        };
+    </script>
+</body>
+</html>
