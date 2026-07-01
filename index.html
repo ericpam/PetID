@@ -149,7 +149,7 @@
                         <input type="text" inputmode="numeric" id="issueDay" style="width:35px; text-align:center;" maxlength="2" oninput="validateDate(this, 31)"> 日
                     </div>
                     <div class="issue-loc-line">
-                        (<input type="text" id="issueLocation" style="width:60px; text-align:center;" maxlength="3" value="">) 初發
+                        (<input type="text" id="issueLocation" style="width:60px; text-align:center;" maxlength="3" value="縣市">) 初發
                         <button type="button" class="upload-btn" style="background-color: #ddd; color: #333; margin-left: 5px; padding: 6px 10px;" onclick="showYearCalcModal()">西元轉民國年</button>
                     </div>
                 </div>
@@ -213,7 +213,7 @@
         <div class="modal-content">
             <div class="modal-warning">請確定填入的資料是否正確再送出，送出後將無法修改</div>
             <div class="modal-input-label">您的帳號:</div>
-            <input type="text" id="shopeeId" class="modal-input" placeholder="請輸入您平台的帳號..." oninput="checkModalInput()" style="width:100%; margin-bottom:10px; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing: border-box;">
+            <input type="text" id="shopeeId" class="modal-input" placeholder="請輸入您蝦皮的帳號..." oninput="checkModalInput()" style="width:100%; margin-bottom:10px; padding:10px; border:1px solid #ccc; border-radius:4px; box-sizing: border-box;">
             
             <div id="modalInfo" class="modal-info-list"></div>
             <div id="modalSummary" class="modal-summary-box"></div>
